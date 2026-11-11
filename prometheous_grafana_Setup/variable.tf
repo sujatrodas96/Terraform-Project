@@ -81,6 +81,12 @@ variable "ingress_rules_monitoring" {
       to_port     = 9090
       protocol    = "tcp"
       cidr_blocks = ["0.0.0.0/0"]
+    },
+    {
+      from_port   = 9093
+      to_port     = 9093
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"] 
     }
   ]
 }
@@ -146,6 +152,7 @@ variable "instance_type" {
 variable "ami_id" {
   description = "AWS AMI ID"
   type        = string
+  default     = "ami-0d97d7f07b25dd693"
 }
 
 # KEY PAIR NAMES

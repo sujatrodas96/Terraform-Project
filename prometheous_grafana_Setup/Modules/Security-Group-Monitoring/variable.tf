@@ -42,6 +42,12 @@ variable "ingress_rules" {
       to_port     = 9090
       protocol    = "tcp"
       cidr_blocks = ["0.0.0.0/0"]
+    },
+    {
+      from_port   = 9093
+      to_port     = 9093
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
     }
   ]
 }
