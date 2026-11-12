@@ -15,7 +15,6 @@ on:
 
 permissions:
   contents: read
-
 concurrency:
   group: prometheus-grafana-terraform
   cancel-in-progress: false
