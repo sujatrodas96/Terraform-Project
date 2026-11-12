@@ -1,5 +1,4 @@
 name: Terraform AWS Deployment
-
 on:
   pull_request:
     branches:
@@ -7,7 +6,6 @@ on:
     paths:
       - "prometheous_grafana_Setup/**"
       - ".github/workflows/terraform-aws.yml"
-
   push:
     branches:
       - main
