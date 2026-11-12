@@ -14,6 +14,7 @@ variable "vpc_id" {
 variable "security_group_id" {
     type = string
     description = "The ID of the security group."
+    default     = "sg-03b18893d2d33d93e"
 }
 
 variable "ingress_rules" {
