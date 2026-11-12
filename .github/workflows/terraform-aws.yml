@@ -22,13 +22,16 @@ concurrency:
   group: prometheus-grafana-terraform
   cancel-in-progress: false
 
-jobs:
+env:
+  AWS_REGION: us-east-1
+  # Must be the same role that trust-policy.json / oidc-role.tf create.
+  AWS_ROLE_ARN: arn:aws:iam::490164024161:role/GitHubActions-Terraform-Role
 
-  # JOB 1: Terraform validation
+jobs:
+  # JOB 1: Validate Terraform on Pull Requests (no AWS credentials needed)
   terraform-validate:
     name: Terraform Validation
     runs-on: ubuntu-latest
-
     if: github.event_name == 'pull_request'
 
     defaults:
@@ -51,18 +54,18 @@ jobs:
       - name: Terraform Validate
         run: terraform validate
 
-
-  # JOB 2: Terraform deployment
+  # JOB 2: Deploy Infrastructure to AWS
   terraform-deploy:
     name: Terraform AWS Deployment
     runs-on: ubuntu-latest
-
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
+    # With this set, the OIDC token's sub claim becomes:
+    # repo:sujatrodas96/Terraform-Project:environment:production
     environment: production
 
     permissions:
-      id-token: write
+      id-token: write # required for OIDC
       contents: read
 
     defaults:
@@ -73,11 +76,12 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Configure AWS OIDC
+      - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::490164024161:role/terra-OIDC
-          aws-region: us-east-1
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
 
       - name: Verify AWS Authentication
         run: aws sts get-caller-identity
