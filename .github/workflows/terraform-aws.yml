@@ -1,3 +1,4 @@
+
 name: Terraform AWS Deployment
 
 on:
@@ -24,7 +25,7 @@ concurrency:
 
 jobs:
 
-  # JOB 1: Validate Terraform on Pull Requests
+  # JOB 1: Terraform validation
   terraform-validate:
     name: Terraform Validation
     runs-on: ubuntu-latest
@@ -52,7 +53,7 @@ jobs:
         run: terraform validate
 
 
-  # JOB 2: Deploy Infrastructure to AWS
+  # JOB 2: Terraform deployment
   terraform-deploy:
     name: Terraform AWS Deployment
     runs-on: ubuntu-latest
@@ -76,7 +77,7 @@ jobs:
       - name: Configure AWS OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::490164024161:role/GitHubActions-Terraform-Role
+          role-to-assume: arn:aws:iam::490164024161:role/terra-OIDC
           aws-region: us-east-1
 
       - name: Verify AWS Authentication
