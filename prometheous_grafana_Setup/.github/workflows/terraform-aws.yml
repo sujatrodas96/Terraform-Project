@@ -1,0 +1,102 @@
+
+name: Terraform AWS Deployment
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "prometheous_grafana_Setup/**"
+      - ".github/workflows/terraform-aws.yml"
+
+  push:
+    branches:
+      - main
+    paths:
+      - "prometheous_grafana_Setup/**"
+      - ".github/workflows/terraform-aws.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prometheus-grafana-terraform
+  cancel-in-progress: false
+
+jobs:
+
+  # JOB 1: Validate Terraform on Pull Requests
+  terraform-validate:
+    name: Terraform Validation
+    runs-on: ubuntu-latest
+
+    if: github.event_name == 'pull_request'
+
+    defaults:
+      run:
+        working-directory: ./prometheous_grafana_Setup
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Format
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Init
+        run: terraform init -backend=false
+
+      - name: Terraform Validate
+        run: terraform validate
+
+
+  # JOB 2: Deploy Infrastructure to AWS
+  terraform-deploy:
+    name: Terraform AWS Deployment
+    runs-on: ubuntu-latest
+
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    environment: production
+
+    permissions:
+      id-token: write
+      contents: read
+
+    defaults:
+      run:
+        working-directory: ./prometheous_grafana_Setup
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::490164024161:role/GitHubActions-Terraform-Role
+          aws-region: us-east-1
+
+      - name: Verify AWS Authentication
+        run: aws sts get-caller-identity
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init -input=false
+
+      - name: Terraform Format
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: terraform plan -input=false -out=tfplan
+
+      - name: Terraform Apply
+        run: terraform apply -input=false -auto-approve tfplan
