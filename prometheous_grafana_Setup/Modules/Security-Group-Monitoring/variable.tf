@@ -79,4 +79,5 @@ variable "region" {
 variable "security_group_id" {
   description = "The ID of the security group."
   type        = string
+  default     = "sg-03b18893d2d33d93e"
 }
