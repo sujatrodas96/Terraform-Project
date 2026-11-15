@@ -1,0 +1,165 @@
+name: Terraform AWS Deployment
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "prometheous_grafana_Setup/**"
+      - ".github/workflows/terraform-aws.yml"
+
+  push:
+    branches:
+      - main
+    paths:
+      - "prometheous_grafana_Setup/**"
+      - ".github/workflows/terraform-aws.yml"
+
+  # Manual run from the Actions tab: choose apply or destroy
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "What to run"
+        type: choice
+        options:
+          - apply
+          - destroy
+        default: apply
+      confirm_destroy:
+        description: 'For destroy only: type "destroy" to confirm'
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prometheus-grafana-terraform
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  # Must be the same role that trust-policy.json / oidc-role.tf create.
+  AWS_ROLE_ARN: arn:aws:iam::490164024161:role/GitHubActions-Terraform-Role
+
+jobs:
+  # JOB 1: Validate Terraform on Pull Requests (no AWS credentials needed)
+  terraform-validate:
+    name: Terraform Validation
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    defaults:
+      run:
+        working-directory: ./prometheous_grafana_Setup
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init -backend=false
+
+      - name: Terraform Validate
+        run: terraform validate
+
+  # JOB 2: Deploy (apply) on push to main, or on manual run with action=apply
+  terraform-deploy:
+    name: Terraform AWS Deployment
+    runs-on: ubuntu-latest
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (
+        github.event_name == 'push' ||
+        (github.event_name == 'workflow_dispatch' && inputs.action == 'apply')
+      )
+
+    # sub claim becomes: repo:sujatrodas96/Terraform-Project:environment:production
+    environment: production
+
+    permissions:
+      id-token: write # required for OIDC
+      contents: read
+
+    defaults:
+      run:
+        working-directory: ./prometheous_grafana_Setup
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
+
+      - name: Verify AWS Authentication
+        run: aws sts get-caller-identity
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init -input=false
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: terraform plan -input=false -out=tfplan
+
+      - name: Terraform Apply
+        run: terraform apply -input=false -auto-approve tfplan
+
+  # JOB 3: Destroy. Manual run only, action=destroy, confirmation typed, main branch only
+  terraform-destroy:
+    name: Terraform AWS Destroy
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' &&
+      inputs.action == 'destroy' &&
+      inputs.confirm_destroy == 'destroy'
+
+    environment: production
+
+    permissions:
+      id-token: write
+      contents: read
+
+    defaults:
+      run:
+        working-directory: ./prometheous_grafana_Setup
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
+
+      - name: Verify AWS Authentication
+        run: aws sts get-caller-identity
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init -input=false
+
+      - name: Terraform Destroy Plan
+        run: terraform plan -destroy -input=false -out=destroy.tfplan
+
+      - name: Terraform Destroy
+        run: terraform apply -input=false -auto-approve destroy.tfplan
