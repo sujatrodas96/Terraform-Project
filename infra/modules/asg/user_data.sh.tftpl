@@ -1,0 +1,24 @@
+#!/bin/bash
+set -euxo pipefail
+export DEBIAN_FRONTEND=noninteractive
+
+apt-get update -y
+apt-get install -y nginx
+
+cat > /etc/nginx/sites-available/default <<'CONF'
+server {
+  listen ${app_port} default_server;
+  location = /health {
+    access_log off;
+    default_type text/plain;
+    return 200 "ok";
+  }
+  location / {
+    root /var/www/html;
+    index index.nginx-debian.html;
+  }
+}
+CONF
+
+systemctl enable nginx
+systemctl restart nginx
